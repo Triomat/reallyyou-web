@@ -1,0 +1,386 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex">
+<title>Really you?</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:wght@400;700&display=swap">
+<style>
+/* Plain, form-like page: one task per screen, step line on top, seal on the result. */
+:root {
+  --paper: #ffffff;
+  --ink: #0b0c0c;
+  --muted: #505a5f;
+  --line: #b1b4b6;
+  --soft: #f3f2f1;
+  --blue: #1d70b8;
+  --blue-dark: #003078;
+  --focus: #ffdd00;
+  --green: #00703c;
+  --red: #d4351c;
+  --font: "Atkinson Hyperlegible", system-ui, -apple-system, "Segoe UI", sans-serif;
+  color-scheme: light;
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; background: var(--paper); color: var(--ink); }
+body { font-family: var(--font); font-size: 19px; line-height: 1.45; -webkit-text-size-adjust: 100%; }
+main { max-width: 32rem; margin: 0 auto; padding: max(16px, env(safe-area-inset-top)) 18px 40px; }
+header { display: flex; align-items: center; gap: 10px; border-bottom: 6px solid var(--blue); padding: 10px 0 12px; }
+header svg { flex: none; }
+header b { font-size: 21px; letter-spacing: .01em; }
+.steps { display: flex; gap: 6px; margin: 18px 0 6px; list-style: none; padding: 0; }
+.steps li { flex: 1; height: 6px; background: var(--soft); border-radius: 0; }
+.steps li.on { background: var(--blue); }
+.steplabel { font-size: 16px; color: var(--muted); margin: 0 0 18px; }
+h1 { font-size: 30px; line-height: 1.15; margin: 0 0 14px; text-wrap: balance; }
+p { margin: 0 0 16px; }
+.who { background: var(--soft); border-left: 6px solid var(--blue); padding: 12px 14px; margin: 0 0 20px; }
+.btn { display: block; width: 100%; min-height: 58px; font: 700 20px var(--font); color: #fff; background: var(--green); border: 0; border-bottom: 3px solid #002d18; border-radius: 0; padding: 12px 16px; cursor: pointer; text-align: center; }
+.btn.secondary { background: var(--soft); color: var(--ink); border-bottom-color: #929191; }
+.btn:focus-visible, input:focus-visible, .tile:focus-visible { outline: 4px solid var(--focus); outline-offset: 0; box-shadow: inset 0 0 0 2px var(--ink); }
+.btn:disabled { opacity: .55; }
+label { display: block; font-weight: 700; margin: 0 0 6px; }
+input { width: 100%; font: 700 30px var(--font); letter-spacing: .3em; padding: 10px 12px; border: 3px solid var(--ink); border-radius: 0; margin: 0 0 18px; }
+.phone { display: block; margin: 8px auto 22px; }
+@media (prefers-reduced-motion: no-preference) {
+  .pulse { animation: pulse 1.6s ease-in-out infinite; transform-origin: center; transform-box: fill-box; }
+  @keyframes pulse { 0%, 100% { opacity: .25; transform: scale(.9); } 50% { opacity: 1; transform: scale(1.05); } }
+}
+.grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; margin: 0 0 18px; }
+.tile { aspect-ratio: 1; width: 100%; padding: 0; border: 3px solid transparent; background: var(--soft); cursor: pointer; }
+.tile img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.tile:active { border-color: var(--blue); }
+.err { color: var(--red); font-weight: 700; border-left: 6px solid var(--red); padding: 6px 12px; margin: 0 0 16px; }
+.seal { display: block; margin: 6px auto 18px; }
+.result-ok h1 { color: var(--green); }
+.result-fail h1 { color: var(--red); }
+.small { font-size: 16px; color: var(--muted); }
+footer { margin-top: 32px; padding-top: 12px; border-top: 1px solid var(--line); font-size: 15px; color: var(--muted); }
+[hidden] { display: none !important; }
+</style>
+</head>
+<body>
+<main>
+  <header>
+    <svg width="28" height="32" viewBox="0 0 28 32" aria-hidden="true"><path d="M14 1 27 6v10c0 7.5-5.5 13.4-13 15C6.5 29.4 1 23.5 1 16V6Z" fill="#1d70b8"/><path d="M8 16.5l4.2 4.2L20.5 12" stroke="#fff" stroke-width="3" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>
+    <b>Really you?</b>
+  </header>
+  <ol class="steps" aria-hidden="true"><li id="s1"></li><li id="s2"></li><li id="s3"></li></ol>
+  <p class="steplabel" id="steplabel"></p>
+  <div id="view"></div>
+  <footer id="footer"></footer>
+</main>
+
+<script>
+"use strict";
+const TEXT = {
+  de: {
+    step: (n) => `Schritt ${n} von 3`,
+    footer: "Diese Seite fragt nie nach Passwörtern, PINs oder Bankdaten.",
+    codeTitle: "Code eingeben",
+    codeText: "Die Person, die dich prüft, nennt dir einen 6-stelligen Code.",
+    codeLabel: "6-stelliger Code",
+    connect: "Weiter",
+    connecting: "Verbinde…",
+    waitTitle: "Einen Moment",
+    waitText: "Die andere Seite bereitet die Prüfung vor.",
+    who: (by) => `<b>${by}</b> möchte prüfen, ob du es wirklich bist.`,
+    cardTitle: "Halte deine Keycard hinten ans Handy",
+    cardText: "Tippe zuerst auf den Knopf. Halte dann deine Keycard, deinen Ring oder Schlüsselanhänger flach an die Rückseite dieses Handys, bis es fertig ist.",
+    cardBtn: "Keycard jetzt anhalten",
+    cardRetry: "Das hat nicht geklappt. Tippe nochmal auf den Knopf und halte die Karte länger still.",
+    cardUnsupported: "Dieser Browser kann keine Keycards lesen. Öffne den Link in Chrome (Android) oder Safari (iPhone).",
+    photoTitle: (r, n) => `Welches Foto kennst du? (${r} von ${n})`,
+    photoText: "Nur eines dieser Bilder stammt aus euren gemeinsamen Momenten. Tippe es an.",
+    photoLoading: "Fotos werden geladen…",
+    photoAlt: (i) => `Foto ${i}`,
+    checking: "Wird geprüft…",
+    checkingText: "Einen Moment, das Ergebnis kommt gleich.",
+    okTitle: "Bestätigt",
+    okText: (by) => `${by} sieht jetzt, dass du es bist. Du kannst diese Seite schließen.`,
+    failTitle: "Nicht bestätigt",
+    failText: (by) => `${by} konnte nicht bestätigen, dass du es bist. Klärt es am besten über eine bekannte Nummer.`,
+    errorTitle: "Verbindung unterbrochen",
+    errorText: "Bitte die Person, die dich prüft, um einen neuen Link.",
+    someone: "Die Person",
+  },
+  en: {
+    step: (n) => `Step ${n} of 3`,
+    footer: "This page never asks for passwords, PINs or bank details.",
+    codeTitle: "Enter the code",
+    codeText: "The person checking you will tell you a 6-digit code.",
+    codeLabel: "6-digit code",
+    connect: "Continue",
+    connecting: "Connecting…",
+    waitTitle: "One moment",
+    waitText: "The other side is preparing the check.",
+    who: (by) => `<b>${by}</b> wants to check that it's really you.`,
+    cardTitle: "Hold your key card to the back of the phone",
+    cardText: "Tap the button first. Then hold your key card, ring or keychain flat against the back of this phone until it's done.",
+    cardBtn: "Hold key card now",
+    cardRetry: "That didn't work. Tap the button again and hold the card still for longer.",
+    cardUnsupported: "This browser can't read key cards. Open the link in Chrome (Android) or Safari (iPhone).",
+    photoTitle: (r, n) => `Which photo do you know? (${r} of ${n})`,
+    photoText: "Only one of these pictures is from your shared moments. Tap it.",
+    photoLoading: "Loading photos…",
+    photoAlt: (i) => `Photo ${i}`,
+    checking: "Checking…",
+    checkingText: "One moment, the result is on its way.",
+    okTitle: "Confirmed",
+    okText: (by) => `${by} now sees that it's you. You can close this page.`,
+    failTitle: "Not confirmed",
+    failText: (by) => `${by} couldn't confirm it's you. Best sort it out on a number you both know.`,
+    errorTitle: "Connection lost",
+    errorText: "Ask the person checking you for a new link.",
+    someone: "The other person",
+  },
+};
+const L = (navigator.language || "de").toLowerCase().startsWith("de") ? TEXT.de : TEXT.en;
+document.documentElement.lang = L === TEXT.de ? "de" : "en";
+document.getElementById("footer").textContent = L.footer;
+
+const DEFAULT_SERVER = "https://ntfy.sh";
+const view = document.getElementById("view");
+const S = { secret: null, server: DEFAULT_SERVER, topic: null, by: null, lastId: null, greeted: false, stopped: false, busy: false };
+
+// ---------- helpers ----------
+const enc = new TextEncoder();
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+async function sha256(str) { return new Uint8Array(await crypto.subtle.digest("SHA-256", enc.encode(str))); }
+function b64d(s) { const bin = atob(s.replace(/-/g, "+").replace(/_/g, "/")); return Uint8Array.from(bin, (c) => c.charCodeAt(0)); }
+function b64e(bytes) { let s = ""; bytes.forEach((b) => (s += String.fromCharCode(b))); return btoa(s); }
+function esc(s) { return String(s).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c])); }
+function byName() { return esc(S.by || L.someone); }
+
+function setStep(n) {
+  [1, 2, 3].forEach((i) => document.getElementById("s" + i).classList.toggle("on", i <= n));
+  document.getElementById("steplabel").textContent = L.step(n);
+}
+function render(html, step) { setStep(step); view.innerHTML = html; const f = view.querySelector("h1"); if (f) { f.tabIndex = -1; f.focus({ preventScroll: true }); } }
+function whoBox() { return S.by ? `<div class="who">${L.who(byName())}</div>` : ""; }
+
+async function topicFor(secret) {
+  const a = "abcdefghijklmnopqrstuvwxyz234567";
+  const h = await sha256("reallyyou-session|" + secret);
+  let t = "rys";
+  for (let i = 0; i < 24; i++) t += a[h[i] & 31];
+  return t;
+}
+
+async function publish(obj) {
+  try {
+    const res = await fetch(`${S.server}/${S.topic}`, { method: "POST", body: JSON.stringify(obj) });
+    return res.ok;
+  } catch (e) { return false; }
+}
+
+// ---------- screens ----------
+function showCodeEntry(error) {
+  render(`
+    <h1>${L.codeTitle}</h1>
+    <p>${L.codeText}</p>
+    ${error ? `<p class="err">${error}</p>` : ""}
+    <form id="f">
+      <label for="code">${L.codeLabel}</label>
+      <input id="code" inputmode="numeric" autocomplete="one-time-code" maxlength="6" pattern="[0-9]{6}" required>
+      <button class="btn" type="submit">${L.connect}</button>
+    </form>`, 1);
+  document.getElementById("f").addEventListener("submit", (e) => {
+    e.preventDefault();
+    const code = document.getElementById("code").value.replace(/\D/g, "");
+    if (code.length === 6) { S.secret = code; start(); }
+  });
+}
+
+function showWaiting() {
+  render(`${whoBox()}<h1>${L.waitTitle}</h1><p>${L.waitText}</p>`, 1);
+}
+
+function phoneSvg() {
+  return `<svg class="phone" width="200" height="200" viewBox="0 0 200 200" aria-hidden="true">
+    <rect x="58" y="18" width="84" height="164" rx="14" fill="#f3f2f1" stroke="#0b0c0c" stroke-width="4"/>
+    <circle cx="100" cy="74" r="26" fill="none" stroke="#1d70b8" stroke-width="5" class="pulse"/>
+    <circle cx="100" cy="74" r="12" fill="#1d70b8"/>
+    <rect x="114" y="96" width="70" height="44" rx="6" fill="#ffdd00" stroke="#0b0c0c" stroke-width="4" transform="rotate(-12 149 118)"/>
+    <path d="M104 70 l-24 -8" stroke="#0b0c0c" stroke-width="0"/>
+  </svg>`;
+}
+
+function showCard(challenge, handles, error) {
+  const supported = !!(window.PublicKeyCredential && navigator.credentials);
+  render(`${whoBox()}
+    <h1>${L.cardTitle}</h1>
+    ${phoneSvg()}
+    <p>${L.cardText}</p>
+    ${error ? `<p class="err">${error}</p>` : ""}
+    ${supported ? `<button class="btn" id="go">${L.cardBtn}</button>` : `<p class="err">${L.cardUnsupported}</p>`}`, 2);
+  if (!supported) return;
+  document.getElementById("go").addEventListener("click", async (e) => {
+    if (S.busy) return;
+    S.busy = true;
+    e.target.disabled = true;
+    try {
+      const cred = await navigator.credentials.get({
+        publicKey: {
+          challenge: b64d(challenge),
+          rpId: location.hostname,
+          allowCredentials: handles.map((h) => ({ type: "public-key", id: b64d(h), transports: ["nfc", "usb"] })),
+          userVerification: "discouraged",
+          timeout: 120000,
+        },
+      });
+      const r = cred.response;
+      showChecking();
+      const ok = await publish({
+        t: "card_response", s: "p",
+        kh: b64e(new Uint8Array(cred.rawId)),
+        ad: b64e(new Uint8Array(r.authenticatorData)),
+        cd: b64e(new Uint8Array(r.clientDataJSON)),
+        sig: b64e(new Uint8Array(r.signature)),
+      });
+      if (!ok) showError();
+    } catch (err) {
+      showCard(challenge, handles, L.cardRetry);
+    } finally {
+      S.busy = false;
+    }
+  });
+}
+
+async function showPhotos(url, round, total) {
+  render(`${whoBox()}<h1>${L.photoTitle(round, total)}</h1><p>${L.photoLoading}</p>`, 2);
+  try {
+    const res = await fetch(url);
+    if (!res.ok) throw new Error("download");
+    const data = new Uint8Array(await res.arrayBuffer());
+    const key = await crypto.subtle.importKey("raw", await sha256("reallyyou-photo|" + S.secret), "AES-GCM", false, ["decrypt"]);
+    const plain = new Uint8Array(await crypto.subtle.decrypt({ name: "AES-GCM", iv: data.slice(0, 12) }, key, data.slice(12)));
+    const dv = new DataView(plain.buffer, plain.byteOffset, plain.byteLength);
+    let p = 0;
+    const count = plain[p++];
+    const urls = [];
+    for (let i = 0; i < count; i++) {
+      const len = dv.getInt32(p); p += 4;
+      urls.push(URL.createObjectURL(new Blob([plain.slice(p, p + len)], { type: "image/jpeg" })));
+      p += len;
+    }
+    render(`${whoBox()}
+      <h1>${L.photoTitle(round, total)}</h1>
+      <p>${L.photoText}</p>
+      <div class="grid">${urls.map((u, i) => `<button class="tile" data-i="${i}" aria-label="${L.photoAlt(i + 1)}"><img src="${u}" alt=""></button>`).join("")}</div>`, 2);
+    view.querySelectorAll(".tile").forEach((b) => b.addEventListener("click", async () => {
+      if (S.busy) return;
+      S.busy = true;
+      showChecking();
+      const ok = await publish({ t: "photo_pick", s: "p", r: round, i: Number(b.dataset.i) });
+      S.busy = false;
+      if (!ok) showError();
+    }));
+  } catch (e) {
+    showError();
+  }
+}
+
+function showChecking() {
+  render(`${whoBox()}<h1>${L.checking}</h1><p>${L.checkingText}</p>`, 2);
+}
+
+function seal(ok) {
+  const color = ok ? "#00703c" : "#d4351c";
+  let rings = "";
+  for (let i = 0; i < 36; i++) {
+    if (!ok && i % 9 === 4) continue; // a broken ring for "not confirmed"
+    rings += `<ellipse cx="90" cy="90" rx="78" ry="30" transform="rotate(${i * 5} 90 90)" fill="none" stroke="${color}" stroke-width="0.8" opacity="0.55"/>`;
+  }
+  const mark = ok
+    ? `<path d="M64 92 l18 18 l36 -40" stroke="#fff" stroke-width="10" fill="none" stroke-linecap="round" stroke-linejoin="round"/>`
+    : `<path d="M68 68 l44 44 M112 68 l-44 44" stroke="#fff" stroke-width="10" stroke-linecap="round"/>`;
+  return `<svg class="seal" width="180" height="180" viewBox="0 0 180 180" aria-hidden="true">${rings}<circle cx="90" cy="90" r="44" fill="${color}"/>${mark}</svg>`;
+}
+
+function showResult(ok) {
+  render(`<div class="${ok ? "result-ok" : "result-fail"}">${seal(ok)}
+    <h1>${ok ? L.okTitle : L.failTitle}</h1>
+    <p>${ok ? L.okText(byName()) : L.failText(byName())}</p></div>`, 3);
+}
+
+function showError() {
+  S.stopped = true;
+  render(`<h1>${L.errorTitle}</h1><p>${L.errorText}</p>`, 3);
+}
+
+// ---------- connection ----------
+function onEvent(e) {
+  if (e.event !== "message") return;
+  S.lastId = e.id;
+  let m;
+  try { m = JSON.parse(e.message); } catch (x) { return; }
+  if (!m || m.s !== "a") return;
+  if (m.by) S.by = m.by;
+  if (m.t === "card_challenge") showCard(m.ch, m.kh || []);
+  else if (m.t === "photo_round" && e.attachment && e.attachment.url) showPhotos(e.attachment.url, m.r, m.n || 3);
+  else if (m.t === "done") { S.stopped = true; showResult(!!m.ok); }
+}
+
+async function listen() {
+  const startTs = Math.floor(Date.now() / 1000);
+  let failures = 0;
+  while (!S.stopped) {
+    try {
+      const since = S.lastId || startTs;
+      const res = await fetch(`${S.server}/${S.topic}/json?since=${since}`);
+      if (!res.ok || !res.body) throw new Error("http");
+      failures = 0;
+      if (!S.greeted) {
+        S.greeted = true;
+        if (!(await publish({ t: "hello", s: "p" }))) { showError(); return; }
+      }
+      const reader = res.body.getReader();
+      const dec = new TextDecoder();
+      let buf = "";
+      while (!S.stopped) {
+        const { value, done } = await reader.read();
+        if (done) break;
+        buf += dec.decode(value, { stream: true });
+        let i;
+        while ((i = buf.indexOf("\n")) >= 0) {
+          const line = buf.slice(0, i).trim();
+          buf = buf.slice(i + 1);
+          if (line) { try { onEvent(JSON.parse(line)); } catch (x) { /* ignore */ } }
+        }
+      }
+      try { reader.cancel(); } catch (x) { /* ignore */ }
+    } catch (e) {
+      failures++;
+      if (failures > 8) { showError(); return; }
+    }
+    if (!S.stopped) await sleep(2000);
+  }
+}
+
+async function start() {
+  render(`<h1>${L.connecting}</h1>`, 1);
+  S.topic = await topicFor(S.secret);
+  showWaiting();
+  listen();
+}
+
+// ---------- boot ----------
+(function boot() {
+  const hash = decodeURIComponent(location.hash.replace(/^#/, ""));
+  if (hash) {
+    const [secret, server] = hash.split("|");
+    S.secret = secret;
+    if (server && /^https:\/\//.test(server)) S.server = server.replace(/\/+$/, "");
+    history.replaceState(null, "", location.pathname);
+    start();
+  } else {
+    showCodeEntry();
+  }
+})();
+</script>
+</body>
+</html>
